@@ -3,9 +3,12 @@ const {
   developmentChains,
   networkConfig,
 } = require("../helper-hardhat-config");
-const { verify } = require("../helper-hardhat-config");
+
+const { verify } = require("../utils/verify");
 
 const VRF_SUB_FUND_AMOUNT = ethers.utils.parseEther("30");
+
+let VRFCoordinatorV2Mock;
 
 module.exports = async function ({ getNamedAccounts, deployments }) {
   const { deploy, log } = deployments;
@@ -15,9 +18,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   let subscriptionId;
 
   if (developmentChains.includes(network.name)) {
-    const VRFCoordinatorV2Mock = await ethers.getContract(
-      "VRFCoordinatorV2Mock"
-    );
+    VRFCoordinatorV2Mock = await ethers.getContract("VRFCoordinatorV2Mock");
     vrfCoordinatorV2Address = VRFCoordinatorV2Mock.address;
     const transactionResponse = await VRFCoordinatorV2Mock.createSubscription();
     const transactionReceipt = await transactionResponse.wait(1);
@@ -45,12 +46,18 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     interval,
   ];
   const raffle = await deploy("Raffle", {
-    form: deployer,
+    from: deployer,
     args: args,
     log: true,
     waitConfirmations: network.config.blockConfirmations || 1,
   });
 
+  if (chainId == 31337) {
+    await VRFCoordinatorV2Mock.addConsumer(
+      subscriptionId.toNumber(),
+      raffle.address
+    );
+  }
   if (
     !developmentChains.includes(network.name) &&
     process.env.ETHERSCAN_API_KEY
